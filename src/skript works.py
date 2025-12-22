@@ -1,12 +1,17 @@
+import os
+import re
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl.utils import get_column_letter
-import re
+from config_paths import OUTPUT_FRANVARO_DIR
+
+# === Sökvägar ===
+INPUT_PATH = OUTPUT_FRANVARO_DIR / "franvaro.xls"
+OUTPUT_DIR = OUTPUT_FRANVARO_DIR
 
 # === STEG 1: Läs in och tolka ===
-raw = pd.read_excel("franvaro.xls", header=None)
+raw = pd.read_excel(INPUT_PATH, header=None)  # för .xls krävs xlrd installerat
 data = []
 aktuell_klass = None
 
@@ -14,7 +19,7 @@ for row in raw.itertuples(index=False):
     cell = str(row[1]) if len(row) > 1 else ""
     if "Klass:" in cell:
         aktuell_klass = cell.split(":")[1].strip()
-    elif pd.to_numeric(row[2], errors="coerce") is not None and aktuell_klass:
+    elif len(row) > 2 and pd.to_numeric(row[2], errors="coerce") is not None and aktuell_klass:
         data.append([aktuell_klass] + list(row[1:]))
 
 # Skapa DataFrame
@@ -24,14 +29,14 @@ df.columns = [
     "n_min", "gf_min", "f_min", "n_pct", "gf_pct", "f_pct"
 ]
 
-# Ta bort rader där personnr är tom eller det står "namn", "personnr", "undv_tid"
+# Ta bort rader där personnr är tom eller där rubriker läckt med
 df = df[
     df["personnr"].notna() &
     ~df["personnr"].astype(str).str.lower().str.contains("personnr|namn|undv_tid")
 ]
 
 # Lägg till årskurs
-def extrahera_årskurs(klass):
+def extrahera_årskurs(klass: str) -> str:
     if isinstance(klass, str):
         klass = klass.strip()
         if klass.lower().startswith("agsä"):
@@ -44,24 +49,21 @@ def extrahera_årskurs(klass):
 df["årskurs"] = df["klass"].apply(extrahera_årskurs)
 
 # Konvertera procent
-def convert_percent(col):
+def convert_percent(col: pd.Series) -> pd.Series:
     return pd.to_numeric(
         col.astype(str)
-        .str.replace("%", "", regex=False)
-        .str.replace(",", ".", regex=False)
-        .str.replace("\xa0", "", regex=False)
-        .str.extract(r"(\d+\.?\d*)")[0],
-        errors='coerce'
+           .str.replace("%", "", regex=False)
+           .str.replace(",", ".", regex=False)
+           .str.replace("\xa0", "", regex=False)
+           .str.extract(r"(\d+\.?\d*)")[0],
+        errors="coerce"
     )
 
 df["närvaro_pct"] = convert_percent(df["n_pct"])
 df["ogiltig_frånvaro_pct"] = convert_percent(df["f_pct"])
 
-# Ta bort helt tomma mätvärden
-df = df[~(
-    df["närvaro_pct"].isna() &
-    df["ogiltig_frånvaro_pct"].isna()
-)]
+# Ta bort helt tomma mätvärden (om båda är NaN)
+df = df[~(df["närvaro_pct"].isna() & df["ogiltig_frånvaro_pct"].isna())]
 
 # === STEG 2: Summering per årskurs ===
 def get_total_kategori(narvaro_pct):
@@ -75,6 +77,7 @@ def get_total_kategori(narvaro_pct):
     else: return "0,0-5,0%"
 
 def get_ogiltig_kategori(p):
+    if pd.isna(p): return None
     if p > 15.0: return "15,1--%"
     elif p > 5.0: return "5,1-15,0%"
     elif p >= 1.0: return "1,0-5,0%"
@@ -111,7 +114,7 @@ for r in dataframe_to_rows(df, index=False, header=True):
     if any(str(cell).strip() not in ["", "nan", "NaN"] for cell in r):
         ws1.append(r)
 
-# Formatering flik 1
+# Formatering (första 5 kolumnerna)
 fill_colors = {'A': "FFFFFF", 'B': "C0C0C0", 'C': "C4D79B", 'D': "FFFF99", 'E': "FF9999"}
 border = Border(
     left=Side(style='thin'), right=Side(style='thin'),
@@ -128,7 +131,7 @@ for row in ws1.iter_rows(min_row=1, max_row=ws1.max_row, min_col=1, max_col=min(
         cell.font = Font(bold=(cell.col_idx == 1))
         cell.border = border
 
-# Justera kolumnbredd
+# Justera kolumnbredd på alla flikar
 for sheet in wb.worksheets:
     for col in sheet.columns:
         max_len = max(len(str(cell.value)) if cell.value else 0 for cell in col)
@@ -139,6 +142,7 @@ ws2 = wb.create_sheet("Översikt per årskurs")
 for r in dataframe_to_rows(summering, index=True, header=True):
     ws2.append(r)
 
-# Spara
-wb.save("franvaro_rensad_kategoriserad.xlsx")
-print("✔️ Klar! Filen 'franvaro_rensad_kategoriserad.xlsx' har sparats.")
+# === Spara ===
+OUTPUT_PATH = os.path.join(OUTPUT_DIR, "franvaro_rensad_kategoriserad.xlsx")
+wb.save(OUTPUT_PATH)
+print(f"✔️ Klar! Filen sparades till {OUTPUT_PATH}")
