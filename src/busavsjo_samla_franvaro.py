@@ -1,6 +1,6 @@
 import xlrd
 import xlwt
-from config_paths import RAW_FRANVARO_DIR, OUTPUT_DIR, LASAR
+from config_paths import RAW_FRANVARO_DIR, OUTPUT_FRANVARO_DIR, LASAR
 
 
 def busavsjo_samla_franvarorapporter():
@@ -10,7 +10,7 @@ def busavsjo_samla_franvarorapporter():
     behåller bara rubriken från första filen och hoppar över de fyra första raderna i resten.
     """
     indata_mapp = RAW_FRANVARO_DIR
-    output_fil = OUTPUT_DIR / "franvaro.xls"
+    output_fil = OUTPUT_FRANVARO_DIR / "franvaro.xls"
 
     wb_out = xlwt.Workbook()
     ws_out = wb_out.add_sheet("Data")
