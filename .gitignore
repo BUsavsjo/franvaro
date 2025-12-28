@@ -1,4 +1,4 @@
 
-# Ignorera allt i data/
-data/**
+# Ignorera allt innehåll i data/ (men behåll mappstrukturen)
+data/**/*
 !data/**/.gitkeep
