@@ -132,3 +132,17 @@ Systemet är designat för att hantera data per läsår. Varje läsår får sin 
 - ✅ Tomma årsmappar commitas till repo
 - ❌ Datafiler (`.xls`, `.xlsx`) versioneras INTE
 - ✅ Enkelt att sätta upp projektet på nya maskiner
+
+## 🛠️ Ny funktionalitet
+
+### Blandklasser
+- Systemet hanterar nu blandklasser (t.ex. "Rörvik 1-2") genom att kategorisera elever baserat på deras födelseår.
+- Konfiguration för blandklasser finns i `config/blandklasser_config.py`.
+
+### Loggning
+- Om en klass inte kan kategoriseras, loggas ett varningsmeddelande i terminalen för felsökning.
+
+Exempel på logg:
+```
+⚠️ Kunde inte bestämma årskurs för klass '1-2' (skola: 'Rörvik').
+```

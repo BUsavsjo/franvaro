@@ -7,6 +7,10 @@ from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
 from config_paths import OUTPUT_FRANVARO_DIR
 
+# Importera blandklass-konfiguration
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from config.blandklasser_config import är_blandklass, få_årskurs_för_blandklass
+
 # === Sökvägar ===
 INPUT_PATH = OUTPUT_FRANVARO_DIR / "franvaro.xls"
 OUTPUT_DIR = OUTPUT_FRANVARO_DIR
@@ -29,14 +33,53 @@ def convert_percent(col: pd.Series) -> pd.Series:
     )
 
 
-def extrahera_arskurs(klass: str) -> str:
-    if isinstance(klass, str):
-        klass = klass.strip()
-        if klass.lower().startswith("agsä"):
-            return klass
-        match = re.search(r"\d", klass)
-        if match:
-            return f"Åk {match.group()}"
+def extrahera_arskurs(klass: str, personnummer: str = None, skola: str = None) -> str:
+    """
+    Extrahera årskurs från klassnamn. Hanterar specialfall som blandklasser.
+    
+    Args:
+        klass: Klassnamn (t.ex. "1-2", "5A", "Åk 7")
+        personnummer: Personnummer för att bestämma årskurs i blandklasser
+        skola: Skolnamn (t.ex. "rörvik") för att kombinera med klass vid blandklasser
+        
+    Returns:
+        Årskurs som sträng (t.ex. "Åk 1", "Åk 2", "Åk F")
+    """
+    if not isinstance(klass, str):
+        return "Åk F"
+    
+    klass = klass.strip()
+    
+    # Kontrollera om det är en blandklass
+    # Prova först bara klassnamnet, sedan kombinerat med skola
+    klass_att_testa = [klass]
+    if skola and isinstance(skola, str):
+        skola_clean = skola.strip()
+        # Prova kombinationer: "skola klass" och "skola-klass"
+        klass_att_testa.append(f"{skola_clean} {klass}")
+        klass_att_testa.append(f"{skola_clean}-{klass}")
+    
+    for test_klass in klass_att_testa:
+        if är_blandklass(test_klass):
+            if personnummer:
+                årskurs = få_årskurs_för_blandklass(test_klass, personnummer)
+                if årskurs:
+                    return årskurs
+            # Om personnummer saknas eller årskurs inte kunde bestämmas, 
+            # försök extrahera från klassnamnet som vanligt
+            break
+    
+    # Specialfall: AGSÄ
+    if klass.lower().startswith("agsä"):
+        return klass
+    
+    # Hitta första siffran i klassnamnet
+    match = re.search(r"\d", klass)
+    if match:
+        return f"Åk {match.group()}"
+    
+    # Om ingen logik matchar, logga klassnamnet för felsökning
+    print(f"⚠️ Kunde inte bestämma årskurs för klass '{klass}' (skola: '{skola}').")
     return "Åk F"
 
 
@@ -180,7 +223,9 @@ df = df[
     ~df["personnr"].astype(str).str.lower().str.contains("personnr|namn|undv_tid")
 ]
 
-df["årskurs"] = df["klass"].apply(extrahera_arskurs)
+# Extrahera årskurs med hänsyn till blandklasser och personnummer
+df["årskurs"] = df.apply(lambda row: extrahera_arskurs(row["klass"], row["personnr"], row["skola"]), axis=1)
+
 df["närvaro_pct"] = convert_percent(df["n_pct"])
 df["ogiltig_frånvaro_pct"] = convert_percent(df["f_pct"])
 
