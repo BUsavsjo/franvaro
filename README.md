@@ -4,7 +4,7 @@ Automatiserad bearbetning och analys av elevfrånvaro från flera rapporter.
 
 ## 📋 Översikt
 
-Detta projekt samlar, bearbetar och analyserar frånvarodata från flera Excel-rapporter. Systemet skapar kategoriserade översikter per årskurs med fokus på närvaro och ogiltig frånvaro.
+Detta projekt samlar, bearbetar och analyserar frånvarodata från flera Excel-rapporter. Systemet skapar kategoriserade översikter per årskurs med fokus på närvaro och ogiltig frånvaro, och lägger nu till skolnamn (från filnamnet) som första kolumn vid sammanslagningen.
 
 ## 📁 Projektstruktur
 
@@ -12,12 +12,12 @@ Detta projekt samlar, bearbetar och analyserar frånvarodata från flera Excel-r
 franvaro/
 ├── src/                              # Källkod
 │   ├── config_paths.py              # Centraliserad sökvägskonfiguration
-│   ├── busavsjo_samla_franvaro.py  # Steg 1: Samla rådata
-│   └── skript works.py              # Steg 2: Analysera och kategorisera
+│   ├── busavsjo_samla_franvaro.py  # Steg 1: Samla rådata (skola-kolumn läggs till)
+│   └── skript works.py              # Steg 2: Analysera och kategorisera (även per skola)
 ├── data/
-│   ├── raw/franvaro/2024-2025/     # Råa .xls-rapporter (lägg filer här)
+│   ├── raw/franvaro/2025-2026/     # Råa .xls-rapporter (lägg filer här)
 │   ├── processed/                   # Mellanresultat
-│   └── output/2024-2025/           # Färdiga rapporter
+│   └── output/2025-2026/           # Färdiga rapporter
 ├── tests/                           # Testmoduler
 ├── notebooks/                       # Jupyter-notebooks för analys
 └── dokumentation/                   # Teknisk dokumentation
@@ -33,7 +33,7 @@ franvaro/
    ```
 
 2. **Lägg rådata i rätt mapp:**
-   - Kopiera alla frånvarorapporter (.xls) till `data/raw/franvaro/2024-2025/`
+   - Kopiera alla frånvarorapporter (.xls) till `data/raw/franvaro/2025-2026/`
 
 ### Arbetsflöde
 
@@ -49,7 +49,8 @@ Bearbetar data och skapar strukturerad rapport:
 ```bash
 python src/skript works.py
 ```
-**Output:** `data/output/2024-2025/franvaro_rensad_kategoriserad.xlsx`
+**Output:** `data/output/2025-2026/franvaro_rensad_kategoriserad.xlsx`
+   - Flikar: Kommun (rensad data), Kommun-översikt, samt en rensad/översikt-flik per skola
 
 ## 📊 Vad systemet gör
 
@@ -88,7 +89,7 @@ Skapar Excel-fil med två flikar:
 
 Uppdatera i `src/config_paths.py`:
 ```python
-LASAR = "2024-2025"  # Uppdatera för nytt läsår
+LASAR = "2025-2026"  # Uppdatera för nytt läsår
 ```
 
 ### Skapa nytt läsår (automatiskt)
@@ -131,3 +132,17 @@ Systemet är designat för att hantera data per läsår. Varje läsår får sin 
 - ✅ Tomma årsmappar commitas till repo
 - ❌ Datafiler (`.xls`, `.xlsx`) versioneras INTE
 - ✅ Enkelt att sätta upp projektet på nya maskiner
+
+## 🛠️ Ny funktionalitet
+
+### Blandklasser
+- Systemet hanterar nu blandklasser (t.ex. "Rörvik 1-2") genom att kategorisera elever baserat på deras födelseår.
+- Konfiguration för blandklasser finns i `config/blandklasser_config.py`.
+
+### Loggning
+- Om en klass inte kan kategoriseras, loggas ett varningsmeddelande i terminalen för felsökning.
+
+Exempel på logg:
+```
+⚠️ Kunde inte bestämma årskurs för klass '1-2' (skola: 'Rörvik').
+```
