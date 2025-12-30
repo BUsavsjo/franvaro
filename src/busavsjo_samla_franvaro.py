@@ -1,6 +1,7 @@
 import xlrd
 import xlwt
-from config_paths import RAW_FRANVARO_DIR, OUTPUT_FRANVARO_DIR, LASAR
+from pathlib import Path
+from config_paths import RAW_FRANVARO_DIR, OUTPUT_FRANVARO_DIR
 
 
 def busavsjo_samla_franvarorapporter():
@@ -18,30 +19,41 @@ def busavsjo_samla_franvarorapporter():
     rad_index = 0
     antal_filer = 0
 
-    for filväg in sorted(indata_mapp.iterdir()):
-        if filväg.suffix == ".xls" and filväg.name != "franvaro.xls":
-            try:
-                wb_in = xlrd.open_workbook(filväg)
-                sheet = wb_in.sheet_by_index(0)
+    for filvag in sorted(indata_mapp.iterdir()):
+        if filvag.suffix.lower() != ".xls" or filvag.name == "franvaro.xls":
+            continue
 
-                start_row = 0 if antal_filer == 0 else 4  # behåll rubrik bara från första filen
+        skola = Path(filvag).stem
 
-                # Infoga filnamn som kommentarrad (om inte första filen)
-                if antal_filer > 0:
-                    ws_out.write(rad_index, 0, f"Från fil: {filväg.name}")
+        try:
+            wb_in = xlrd.open_workbook(filvag)
+            sheet = wb_in.sheet_by_index(0)
+
+            start_row = 0 if antal_filer == 0 else 4  # behåll rubrik bara från första filen
+
+            for row_idx in range(start_row, sheet.nrows):
+                row_vals = sheet.row_values(row_idx)
+
+                # Rubrikrad från första filen: lägg till "skola" först
+                if antal_filer == 0 and row_idx == 0:
+                    ws_out.write(rad_index, 0, "skola")
+                    for col_idx, cell in enumerate(row_vals):
+                        ws_out.write(rad_index, col_idx + 1, str(cell))
                     rad_index += 1
+                    continue
 
-                for row_idx in range(start_row, sheet.nrows):
-                    for col_idx, cell in enumerate(sheet.row_values(row_idx)):
-                        ws_out.write(rad_index, col_idx, str(cell))
-                    rad_index += 1
+                # Data: skola i kol 0 + resten skiftat
+                ws_out.write(rad_index, 0, skola)
+                for col_idx, cell in enumerate(row_vals):
+                    ws_out.write(rad_index, col_idx + 1, str(cell))
+                rad_index += 1
 
-                antal_filer += 1
+            antal_filer += 1
 
-            except Exception as e:
-                print(f"⚠️ Kunde inte läsa {filväg.name}: {e}")
+        except Exception as e:
+            print(f"⚠️ Kunde inte läsa {filvag.name}: {e}")
 
-    wb_out.save(output_fil)
+    wb_out.save(str(output_fil))
     print(f"✔️ Skapade '{output_fil}' med {antal_filer} rapporter")
 
 
